@@ -117,5 +117,10 @@ int main()
     auto* add1 = (int (*)(int))(intptr_t)sym.getAddress();
     std::cout << "Result: " << add1(10) << std::endl;
 
+    cantFail(jit->addModule(std::move(Embed)));
+    JITEvaluatedSymbol sym1 = cantFail(jit->lookup("_Z3adddd"));
+    auto* add2 = (int (*)(int))(intptr_t)sym.getAddress();
+    std::cout << "Result: " << add2(12) << std::endl;
+
     return 0;
 }
