@@ -8,6 +8,7 @@
 #include "llvm/IRReader/IRReader.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/SourceMgr.h"
+#include <llvm/Transforms/Utils/Cloning.h>
 
 #include "jit.h"
 #include <easy/jit.h>
@@ -96,7 +97,8 @@ int main()
 {
     std::unique_ptr<easy::Function> CompiledFunction = _jit(add, _1, 1);
     llvm::Module const & M = CompiledFunction->getLLVMModule();
-    WriteOptimizedToFile(M);
+    std::unique_ptr<llvm::Module> Embed = llvm::CloneModule(M);
+    WriteOptimizedToFile(*Embed);
 
     InitializeNativeTarget();
     InitializeNativeTargetAsmPrinter();
