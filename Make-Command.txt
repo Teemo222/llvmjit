@@ -1,0 +1,3 @@
+export LD_LIBRARY_PATH=../easy-just-in-time/_build/bin
+
+clang++-11 --std=c++14 main.cpp -I./include -Xclang -load -Xclang ../easy-just-in-time/_build/bin/EasyJitPass.so -I../easy-just-in-time/include -L../easy-just-in-time/_build/bin -lEasyJitRuntime `llvm-config-11 --cxxflags --ldflags --libs --libfiles --system-libs --ignore-libllvm`

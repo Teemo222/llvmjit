@@ -10,6 +10,7 @@
 #include "llvm/Support/SourceMgr.h"
 
 #include "jit.h"
+#include <easy/jit.h>
 
 #include <iostream>
 #include <memory>
@@ -17,6 +18,31 @@
 
 using namespace llvm;
 using namespace llvm::orc;
+using namespace std::placeholders;
+
+double add (double a, double b) {
+  return a+b;
+}
+
+template<class T, class ... Args>
+std::unique_ptr<easy::Function> get_function(easy::Context const &C, T &&Fun) {
+  auto* FunPtr = easy::meta::get_as_pointer(Fun);
+  return easy::Function::Compile(reinterpret_cast<void*>(FunPtr), C);
+}
+
+template<class T, class ... Args>
+std::unique_ptr<easy::Function> EASY_JIT_COMPILER_INTERFACE _jit(T &&Fun, Args&& ... args) {
+  auto C = easy::get_context_for<T, Args...>(std::forward<Args>(args)...);
+  return get_function<T, Args...>(C, std::forward<T>(Fun));
+}
+
+void WriteOptimizedToFile(llvm::Module const &M) {
+
+  std::error_code Error;
+  llvm::raw_fd_ostream Out("bitcode", Error, llvm::sys::fs::F_None);
+
+  Out << M;
+}
 
 std::unique_ptr<Module> buildprog(LLVMContext& ctx)
 {
@@ -68,6 +94,10 @@ std::unique_ptr<Module> buildsrc(LLVMContext& Context)
 
 int main()
 {
+    std::unique_ptr<easy::Function> CompiledFunction = _jit(add, _1, 1);
+    llvm::Module const & M = CompiledFunction->getLLVMModule();
+    WriteOptimizedToFile(M);
+
     InitializeNativeTarget();
     InitializeNativeTargetAsmPrinter();
 
