@@ -21,8 +21,10 @@ using namespace llvm;
 using namespace llvm::orc;
 using namespace std::placeholders;
 
-double add (double a, double b) {
-  return a+b;
+extern "C" {
+  double add (double a, double b) {
+    return a+b;
+  }
 }
 
 template<class T, class ... Args>
@@ -118,8 +120,8 @@ int main()
     std::cout << "Result: " << add1(10) << std::endl;
 
     cantFail(jit->addModule(std::move(Embed)));
-    JITEvaluatedSymbol sym1 = cantFail(jit->lookup("_Z3adddd"));
-    auto* add2 = (int (*)(int))(intptr_t)sym.getAddress();
+    JITEvaluatedSymbol sym1 = cantFail(jit->lookup("add"));
+    auto* add2 = (double (*)(double))(intptr_t)sym1.getAddress();
     std::cout << "Result: " << add2(12) << std::endl;
 
     return 0;
