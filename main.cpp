@@ -9,6 +9,7 @@
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/SourceMgr.h"
 #include <llvm/Transforms/Utils/Cloning.h>
+#include "llvm/Linker/Linker.h"
 
 #include "jit.h"
 #include <easy/jit.h>
@@ -21,9 +22,22 @@ using namespace llvm;
 using namespace llvm::orc;
 using namespace std::placeholders;
 
+struct block {
+  int b1;
+  int b2;
+};
+
 extern "C" {
-  double add (double a, double b) {
-    return a+b;
+
+  int add (int a, int b) {
+    int *dynamic_mem = (int *) malloc(sizeof(int));
+    *dynamic_mem = 100;
+
+    struct block blk;
+    blk.b1 = 2;
+    blk.b2 = 3;
+
+    return a + b + *dynamic_mem + blk.b1 + blk.b2;
   }
 }
 
@@ -67,7 +81,7 @@ std::unique_ptr<Module> buildprog(LLVMContext& ctx)
     argx->setName("x");
 
     Value* add = builder.CreateAdd(one, argx);
-
+    
     builder.CreateRet(add);
 
     return llmod;
@@ -112,17 +126,36 @@ int main()
     //auto llmod = std::move(buildsrc(ctx));
     if (!llmod) return -1;
 
+    // Link the main module with the easy::jit extracted module
+    llvm::Linker::linkModules(*llmod, std::move(Embed));
+
+    llvm::Function * add_func = llmod->getFunction("add");
+    assert(add_func);
+
+    llvm::Function * add1_func = llmod->getFunction("add1");
+
+
+    // Call add in add1
+    {
+      BasicBlock * entry_block = &(add1_func->getEntryBlock());
+      Instruction * ret =	entry_block->getTerminator();
+      IRBuilder<> builder(ret);
+
+      std::vector<llvm::Value *> llvm_parameters;
+      llvm_parameters.push_back(llvm::ConstantInt::get(llvm::Type::getInt32Ty(ctx), 100, true));
+
+      llvm::Value * result = builder.CreateCall(add_func, llvm_parameters);
+      builder.CreateRet(result);
+
+      ret->eraseFromParent();
+    }
+   
     cantFail(jit->addModule(std::move(llmod)));
 
     JITEvaluatedSymbol sym = cantFail(jit->lookup("add1"));
 
     auto* add1 = (int (*)(int))(intptr_t)sym.getAddress();
     std::cout << "Result: " << add1(10) << std::endl;
-
-    cantFail(jit->addModule(std::move(Embed)));
-    JITEvaluatedSymbol sym1 = cantFail(jit->lookup("add"));
-    auto* add2 = (double (*)(double))(intptr_t)sym1.getAddress();
-    std::cout << "Result: " << add2(12) << std::endl;
 
     return 0;
 }
